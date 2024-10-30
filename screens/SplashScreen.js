@@ -4,12 +4,13 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 
 const SplashScreen = ({ navigation }) => {
   useEffect(() => {
-    // Simulate a loading process (e.g., checking user authentication)
+    // Simulate loading process (e.g., checking user authentication)
     const timer = setTimeout(() => {
-      navigation.replace('Login'); // Navigate to Login after 2 seconds
+      // Use navigation.replace to avoid going back to SplashScreen
+      navigation.replace('Login'); // or navigate to 'Map' if authenticated
     }, 2000);
 
-    return () => clearTimeout(timer); // Cleanup the timer
+    return () => clearTimeout(timer); // Clean up the timer on unmount
   }, [navigation]);
 
   return (
@@ -25,7 +26,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0', // Feel free to customize the color
+    backgroundColor: '#f0f0f0',
   },
   title: {
     fontSize: 32,
