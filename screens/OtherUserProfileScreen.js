@@ -1,16 +1,45 @@
-// screens/OtherUserProfileScreen.js
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+// screens/OtherUserProfile.js
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Alert } from 'react-native';
+import { db } from '../services/firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
 
-const OtherUserProfileScreen = ({ route }) => {
-  const { user } = route.params; // Get user data passed from SearchScreen
+const OtherUserProfile = ({ route }) => {
+  const { userId } = route.params;
+  const [userData, setUserData] = useState(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const docRef = doc(db, 'users', userId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setUserData(docSnap.data());
+        } else {
+          Alert.alert('Error', 'User not found');
+        }
+      } catch (error) {
+        Alert.alert('Error', error.message);
+      }
+    };
+
+    fetchUserData();
+  }, [userId]);
+
+  if (!userData) {
+    return (
+      <View style={styles.container}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{user.name || user.username}'s Profile</Text>
-      <Text style={styles.info}>Username: {user.username}</Text>
-      <Text style={styles.info}>Email: {user.email}</Text>
-      {/* Add any other details or options here */}
+      <Text style={styles.title}>{userData.name}'s Profile</Text>
+      <Text>Username: {userData.username}</Text>
+      <Text>Email: {userData.email}</Text>
     </View>
   );
 };
@@ -20,19 +49,13 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  info: {
-    fontSize: 18,
-    marginVertical: 10,
-    textAlign: 'center',
+    marginBottom: 10,
   },
 });
 
-export default OtherUserProfileScreen;
+export default OtherUserProfile;

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Button, TouchableOpacity, Alert } from 'react-native';
 import { auth } from '../services/firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -10,9 +11,12 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Store user UID in AsyncStorage
+      await AsyncStorage.setItem('userToken', userCredential.user.uid);
+      
       Alert.alert('Logged in successfully!');
-      // Redirect to main app (handled by RootNavigator based on auth state)
     } catch (error) {
       Alert.alert('Error:', error.message);
     }

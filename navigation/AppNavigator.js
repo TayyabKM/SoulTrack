@@ -2,7 +2,8 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import TabNavigator from './TabNavigator';
-import OtherUserProfileScreen from '../screens/OtherUserProfileScreen'; // Import OtherUserProfileScreen
+import OtherUserProfileScreen from '../screens/OtherUserProfileScreen'; 
+import ConnectionsScreen from '../screens/ConnectionsScreen';
 
 const Stack = createStackNavigator();
 
@@ -14,6 +15,11 @@ const AppNavigator = () => {
       
       {/* OtherUserProfileScreen is for viewing profiles of other users, navigated from SearchScreen */}
       <Stack.Screen name="OtherUserProfile" component={OtherUserProfileScreen} options={{ title: 'User Profile' }} />
+      <Stack.Screen 
+        name="Connections" 
+        component={ConnectionsScreen} 
+        options={{ title: 'Connections' }} 
+      />
     </Stack.Navigator>
   );
 };

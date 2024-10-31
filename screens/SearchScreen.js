@@ -1,50 +1,83 @@
 // screens/SearchScreen.js
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { db } from '../services/firebaseConfig';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { View, Text, TextInput, Button, FlatList, Alert, TouchableOpacity, StyleSheet } from 'react-native';
+import { db, auth } from '../services/firebaseConfig';
+import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
 
 const SearchScreen = ({ navigation }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [results, setResults] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+
+  // Fetch the connection status for each user in the search results
+  const fetchConnectionStatus = async (otherUserId) => {
+    const currentUserUid = auth.currentUser.uid;
+    const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
+    const currentUserDoc = await getDoc(doc(db, 'users', currentUserUid));
+    
+    if (otherUserDoc.exists() && currentUserDoc.exists()) {
+      const otherUserData = otherUserDoc.data();
+      const currentUserData = currentUserDoc.data();
+
+      const isPendingRequest = otherUserData.pendingRequests?.includes(currentUserUid);
+      const isConnected = currentUserData.connections?.includes(otherUserId);
+
+      return { isPendingRequest, isConnected };
+    }
+    return { isPendingRequest: false, isConnected: false };
+  };
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      Alert.alert("Please enter a username to search.");
-      return;
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('username', '==', searchTerm));
+    const querySnapshot = await getDocs(q);
+    
+    const results = [];
+    for (const docSnap of querySnapshot.docs) {
+      const userData = docSnap.data();
+      const userId = docSnap.id;
+      if (userId !== auth.currentUser.uid) {
+        const { isPendingRequest, isConnected } = await fetchConnectionStatus(userId);
+        results.push({ id: userId, ...userData, isPendingRequest, isConnected });
+      }
     }
+    setSearchResults(results);
+  };
 
+  const handleConnect = async (userId, isPendingRequest, isConnected) => {
     try {
-      const q = query(collection(db, 'users'), where('username', '==', searchQuery));
-      const querySnapshot = await getDocs(q);
+      const userDocRef = doc(db, 'users', userId);
+      const currentUserUid = auth.currentUser.uid;
 
-      const users = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      if (users.length === 0) {
-        Alert.alert("No users found.");
+      if (isConnected) {
+        await updateDoc(userDocRef, {
+          connections: arrayRemove(currentUserUid)
+        });
+        await updateDoc(doc(db, 'users', currentUserUid), {
+          connections: arrayRemove(userId)
+        });
+        Alert.alert('Disconnected', 'You are no longer connected.');
+      } else if (isPendingRequest) {
+        await updateDoc(userDocRef, {
+          pendingRequests: arrayRemove(currentUserUid)
+        });
+        Alert.alert('Request Canceled', 'You have unsent the connection request.');
+      } else {
+        await updateDoc(userDocRef, {
+          pendingRequests: arrayUnion(currentUserUid)
+        });
+        Alert.alert('Request Sent', 'Connection request has been sent!');
       }
 
-      setResults(users);
+      handleSearch(); // Refresh search results to reflect new connection state
     } catch (error) {
-      console.error("Error searching users:", error);
-      Alert.alert("Error searching users:", error.message);
+      Alert.alert('Error', error.message);
     }
   };
 
-  const handleUserSelect = (user) => {
-    // Navigate to OtherUserProfileScreen with user details
-    navigation.navigate('OtherUserProfile', { user });
+  // Navigate to the other user's profile
+  const viewUserProfile = (userId) => {
+    navigation.navigate('OtherUserProfile', { userId });
   };
-
-  const renderItem = ({ item }) => (
-    <TouchableOpacity style={styles.userItem} onPress={() => handleUserSelect(item)}>
-      <Text style={styles.userName}>{item.name || item.username}</Text>
-      <Text style={styles.userEmail}>{item.email}</Text>
-    </TouchableOpacity>
-  );
 
   return (
     <View style={styles.container}>
@@ -52,16 +85,30 @@ const SearchScreen = ({ navigation }) => {
       <TextInput
         style={styles.input}
         placeholder="Enter username"
-        value={searchQuery}
-        onChangeText={setSearchQuery}
+        value={searchTerm}
+        onChangeText={setSearchTerm}
       />
       <Button title="Search" onPress={handleSearch} />
-
       <FlatList
-        data={results}
+        data={searchResults}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        ListEmptyComponent={<Text style={styles.noResults}>No results found</Text>}
+        renderItem={({ item }) => (
+          <View style={styles.resultContainer}>
+            <TouchableOpacity onPress={() => viewUserProfile(item.id)}>
+              <Text style={styles.userText}>{item.name}</Text>
+            </TouchableOpacity>
+            <Text>{item.email}</Text>
+            <TouchableOpacity
+              onPress={() => handleConnect(item.id, item.isPendingRequest, item.isConnected)}
+              style={styles.connectButton}
+            >
+              <Text style={styles.buttonText}>
+                {item.isConnected ? 'Disconnect' : item.isPendingRequest ? 'Unsend' : 'Connect'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        ListEmptyComponent={<Text>No results found</Text>}
       />
     </View>
   );
@@ -76,7 +123,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 20,
     textAlign: 'center',
   },
   input: {
@@ -87,24 +134,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginBottom: 15,
   },
-  userItem: {
-    padding: 15,
-    borderBottomColor: '#ccc',
+  resultContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
     borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
   },
-  userName: {
-    fontSize: 18,
+  userText: {
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#1E90FF',
+    marginRight: 10,
   },
-  userEmail: {
-    fontSize: 16,
-    color: '#666',
+  connectButton: {
+    backgroundColor: '#1E90FF',
+    padding: 8,
+    borderRadius: 5,
   },
-  noResults: {
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 16,
-    color: '#888',
+  buttonText: {
+    color: '#fff',
   },
 });
 
