@@ -1,40 +1,55 @@
 // screens/SignupScreen.js
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Button, Alert } from 'react-native';
-import { auth, db } from '../services/firebaseConfig';
+import { View, Text, TextInput, Button, Alert, StyleSheet } from 'react-native';
+import { auth, db } from '../services/firebaseConfig';  // Import `auth` and `db` from your firebaseConfig.js
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 
 const SignupScreen = ({ navigation }) => {
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [name, setName] = useState('');
 
   const handleSignup = async () => {
-    try {
-      // Create user with email and password in Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+    if (!email || !password || !username || !name) {
+      Alert.alert('Please fill in all fields');
+      return;
+    }
 
-      // Save user data in Firestore
-      await setDoc(doc(db, 'users', user.uid), {
-        name,
+    try {
+      // Step 1: Register the user with Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userId = userCredential.user.uid;
+
+      // Step 2: Add user details to Firestore with `username` as document ID
+      await setDoc(doc(db, 'users', username), {  // Here `username` is used as the document ID
+        username,
         email,
+        name,
+        connections: [], // Initialize connections as an empty array
       });
 
-      Alert.alert('Account created successfully!');
-      navigation.navigate('Login');
+      Alert.alert('User registered successfully!');
+      navigation.navigate('Login'); // Redirect to the login screen
     } catch (error) {
-      Alert.alert('Error:', error.message);
+      console.error('Signup Error:', error);
+      Alert.alert('Signup Error:', error.message);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Create an Account</Text>
+      <Text style={styles.title}>Sign Up</Text>
       <TextInput
         style={styles.input}
-        placeholder="Name"
+        placeholder="Username"
+        value={username}
+        onChangeText={setUsername}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Full Name"
         value={name}
         onChangeText={setName}
       />
@@ -52,7 +67,7 @@ const SignupScreen = ({ navigation }) => {
         value={password}
         onChangeText={setPassword}
       />
-      <Button title="Save" onPress={handleSignup} />
+      <Button title="Sign Up" onPress={handleSignup} />
     </View>
   );
 };
@@ -61,7 +76,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    padding: 20,
     backgroundColor: '#fff',
   },
   title: {
