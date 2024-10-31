@@ -16,24 +16,23 @@ const SignupScreen = ({ navigation }) => {
       Alert.alert('Please fill in all fields');
       return;
     }
-
+  
     try {
       // Step 1: Register the user with Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const userId = userCredential.user.uid;
-
-      // Step 2: Add user details to Firestore with `username` as document ID
-      await setDoc(doc(db, 'users', username), {  // Here `username` is used as the document ID
+  
+      // Step 2: Add user details to Firestore with UID as document ID
+      await setDoc(doc(db, 'users', userId), {
         username,
         email,
         name,
         connections: [], // Initialize connections as an empty array
       });
-
+  
       Alert.alert('User registered successfully!');
       navigation.navigate('Login'); // Redirect to the login screen
     } catch (error) {
-      console.error('Signup Error:', error);
       Alert.alert('Signup Error:', error.message);
     }
   };

@@ -4,7 +4,7 @@ import { View, Text, TextInput, Button, FlatList, TouchableOpacity, StyleSheet, 
 import { db } from '../services/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
-const SearchScreen = () => {
+const SearchScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
 
@@ -15,7 +15,6 @@ const SearchScreen = () => {
     }
 
     try {
-      // Query Firestore to find users by username
       const q = query(collection(db, 'users'), where('username', '==', searchQuery));
       const querySnapshot = await getDocs(q);
 
@@ -35,18 +34,17 @@ const SearchScreen = () => {
     }
   };
 
+  const handleUserSelect = (user) => {
+    // Navigate to OtherUserProfileScreen with user details
+    navigation.navigate('OtherUserProfile', { user });
+  };
+
   const renderItem = ({ item }) => (
     <TouchableOpacity style={styles.userItem} onPress={() => handleUserSelect(item)}>
       <Text style={styles.userName}>{item.name || item.username}</Text>
       <Text style={styles.userEmail}>{item.email}</Text>
     </TouchableOpacity>
   );
-
-  const handleUserSelect = (user) => {
-    Alert.alert(`Selected user: ${user.name || user.username}`);
-    // Placeholder for any actions you want to take when a user is selected
-    // e.g., navigate to a profile page or send a connection request
-  };
 
   return (
     <View style={styles.container}>
