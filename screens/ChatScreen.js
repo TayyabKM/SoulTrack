@@ -1,17 +1,22 @@
 // screens/ChatScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, FlatList, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, TextInput, Button, FlatList, Text, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { db, auth } from '../services/firebaseConfig';
 import { collection, addDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 
-const ChatScreen = () => {
+const ChatScreen = ({ route, navigation }) => {
+  const { connectionUserId, connectionUserName } = route.params; // Pass connection user data from navigation
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const currentUser = auth.currentUser;
 
-  useEffect(() => {
-    const chatId = 'YOUR_CHAT_ID'; // Replace with your chat ID logic
+  // Dynamically generate chat ID based on both user IDs
+  const chatId = currentUser.uid < connectionUserId
+    ? `${currentUser.uid}_${connectionUserId}`
+    : `${connectionUserId}_${currentUser.uid}`;
 
+  // Listen to messages for this chat ID
+  useEffect(() => {
     const messagesRef = collection(db, 'chats', chatId, 'messages');
     const messagesQuery = query(messagesRef, orderBy('timestamp', 'desc'));
 
@@ -24,13 +29,11 @@ const ChatScreen = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [chatId]);
 
   const handleSendMessage = async () => {
     if (newMessage.trim()) {
       try {
-        const chatId = 'YOUR_CHAT_ID'; // Replace with your chat ID logic
-
         const messagesRef = collection(db, 'chats', chatId, 'messages');
         await addDoc(messagesRef, {
           text: newMessage,
@@ -40,7 +43,7 @@ const ChatScreen = () => {
 
         setNewMessage('');
       } catch (error) {
-        console.error('Error sending message:', error.message);
+        Alert.alert('Error sending message', error.message);
       }
     }
   };
@@ -54,7 +57,7 @@ const ChatScreen = () => {
       <FlatList
         data={messages}
         keyExtractor={(item) => item.id}
-        inverted // This inverts the list to show the latest message at the bottom
+        inverted // Show latest message at the bottom
         renderItem={({ item }) => (
           <View style={[styles.messageContainer, item.senderId === currentUser.uid ? styles.myMessage : styles.theirMessage]}>
             <Text style={styles.messageText}>{item.text}</Text>
