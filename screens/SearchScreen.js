@@ -1,9 +1,10 @@
+// screens/SearchScreen.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Button, FlatList, Alert, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { db, auth } from '../services/firebaseConfig';
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 
-const SearchScreen = () => {
+const SearchScreen = ({ navigation }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -110,9 +111,14 @@ const SearchScreen = () => {
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => (
-          <View style={styles.resultContainer}>
-            <Text>{item.name}</Text>
-            <Text>{item.email}</Text>
+          <TouchableOpacity
+            style={styles.resultContainer}
+            onPress={() => navigation.navigate('OtherUserProfile', { userId: item.id })} // Navigate to OtherUserProfile
+          >
+            <View>
+              <Text>{item.name}</Text>
+              <Text>{item.email}</Text>
+            </View>
             <TouchableOpacity
               onPress={() => handleConnect(item.id, item.connectionStatus)}
               style={styles.connectButton}
@@ -125,7 +131,7 @@ const SearchScreen = () => {
                   : 'Connect'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         )}
         ListEmptyComponent={<Text>No results found</Text>}
       />
@@ -156,6 +162,7 @@ const styles = StyleSheet.create({
   resultContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
