@@ -4,7 +4,6 @@ import { View, Text, StyleSheet, Button, Alert } from 'react-native';
 import { auth, db } from '../services/firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const UserProfileScreen = ({ navigation }) => {
   const [userData, setUserData] = useState(null);
@@ -17,7 +16,6 @@ const UserProfileScreen = ({ navigation }) => {
         try {
           const docRef = doc(db, 'users', currentUser.uid);
           const docSnap = await getDoc(docRef);
-
           if (docSnap.exists()) {
             setUserData(docSnap.data());
           } else {
@@ -39,15 +37,10 @@ const UserProfileScreen = ({ navigation }) => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      await AsyncStorage.removeItem('userToken'); // Clear userToken on logout
-      navigation.replace('Login'); // Redirect to login screen
+      navigation.replace('Login');
     } catch (error) {
       Alert.alert('Logout Error', error.message);
     }
-  };
-
-  const handleViewConnections = () => {
-    navigation.navigate('Connections'); // Navigate to the ConnectionsScreen
   };
 
   if (loading) {
@@ -72,7 +65,7 @@ const UserProfileScreen = ({ navigation }) => {
       <Text style={styles.info}>Name: {userData.name}</Text>
       <Text style={styles.info}>Username: {userData.username}</Text>
       <Text style={styles.info}>Email: {userData.email}</Text>
-      <Button title="View Connections" onPress={handleViewConnections} />
+      <Button title="View Connections" onPress={() => navigation.navigate('AllConnections')} />
       <Button title="Logout" onPress={handleLogout} />
     </View>
   );
