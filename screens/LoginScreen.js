@@ -12,15 +12,17 @@ const LoginScreen = ({ navigation }) => {
   const handleLogin = async () => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+  
       // Store user UID in AsyncStorage
       await AsyncStorage.setItem('userToken', userCredential.user.uid);
       
       Alert.alert('Logged in successfully!');
+      navigation.replace('Home'); // Navigate to main app directly
     } catch (error) {
       Alert.alert('Error:', error.message);
     }
   };
+  
 
   return (
     <View style={styles.container}>

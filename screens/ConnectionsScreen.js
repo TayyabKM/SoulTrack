@@ -1,57 +1,53 @@
 // screens/ConnectionsScreen.js
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
 import { auth, db } from '../services/firebaseConfig';
-import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
 
 const ConnectionsScreen = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const currentUser = auth.currentUser;
 
+  // Real-time listener setup
   useEffect(() => {
     if (!currentUser) return;
 
-    // Real-time listener for the current user's document
-    const unsubscribe = onSnapshot(doc(db, 'users', currentUser.uid), (docSnap) => {
+    // Real-time listener for pending requests in the current user's document
+    const unsubscribe = onSnapshot(doc(db, 'users', currentUser.uid), async (docSnap) => {
       if (docSnap.exists()) {
         const userData = docSnap.data();
-        const pendingRequests = userData.connectionRequests || [];
+        const pendingRequests = userData.pendingRequests || [];
         const requestDetails = [];
 
-        // Fetch each user's data for pending requests
-        const fetchRequests = async () => {
-          const details = [];
-          for (const requestId of pendingRequests) {
-            const requestUserDoc = await getDoc(doc(db, 'users', requestId));
-            if (requestUserDoc.exists()) {
-              details.push({
-                id: requestId,
-                ...requestUserDoc.data(),
-              });
-            }
+        for (const requestId of pendingRequests) {
+          const requestUserDoc = await getDoc(doc(db, 'users', requestId));
+          if (requestUserDoc.exists()) {
+            requestDetails.push({
+              id: requestId,
+              ...requestUserDoc.data(),
+            });
           }
-          setRequests(details);
-          setLoading(false);
-        };
+        }
 
-        fetchRequests();
+        setRequests(requestDetails);
+        setLoading(false);
       } else {
         setRequests([]);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => unsubscribe(); // Clean up listener on unmount
   }, [currentUser]);
 
   const handleAccept = async (userId) => {
     try {
-      // Add each user to each other’s connections list and remove the request
       const userDocRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userDocRef, {
         connections: arrayUnion(userId),
-        connectionRequests: arrayRemove(userId),
+        pendingRequests: arrayRemove(userId),
       });
 
       const otherUserDocRef = doc(db, 'users', userId);
@@ -69,13 +65,21 @@ const ConnectionsScreen = () => {
     try {
       const userDocRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userDocRef, {
-        connectionRequests: arrayRemove(userId),
+        pendingRequests: arrayRemove(userId),
       });
 
       Alert.alert('Request Declined');
     } catch (error) {
       Alert.alert('Error', error.message);
     }
+  };
+
+  // Pull-to-refresh function
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false); // End refreshing after short delay
+    }, 1000);
   };
 
   if (loading) {
@@ -104,6 +108,7 @@ const ConnectionsScreen = () => {
           </View>
         )}
         ListEmptyComponent={<Text>No connection requests</Text>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       />
     </View>
   );

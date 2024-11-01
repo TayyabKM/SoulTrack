@@ -1,83 +1,99 @@
-// screens/SearchScreen.js
-import React, { useState } from 'react';
-import { View, Text, TextInput, Button, FlatList, Alert, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TextInput, Button, FlatList, Alert, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { db, auth } from '../services/firebaseConfig';
-import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 
-const SearchScreen = ({ navigation }) => {
+const SearchScreen = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch the connection status for each user in the search results
-  const fetchConnectionStatus = async (otherUserId) => {
-    const currentUserUid = auth.currentUser.uid;
-    const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
-    const currentUserDoc = await getDoc(doc(db, 'users', currentUserUid));
-    
-    if (otherUserDoc.exists() && currentUserDoc.exists()) {
-      const otherUserData = otherUserDoc.data();
-      const currentUserData = currentUserDoc.data();
+  const currentUserUid = auth.currentUser?.uid;
 
-      const isPendingRequest = otherUserData.pendingRequests?.includes(currentUserUid);
-      const isConnected = currentUserData.connections?.includes(otherUserId);
+  // Real-time listener for current user's connection status
+  useEffect(() => {
+    if (!currentUserUid) return;
 
-      return { isPendingRequest, isConnected };
-    }
-    return { isPendingRequest: false, isConnected: false };
-  };
+    const unsubscribe = onSnapshot(doc(db, 'users', currentUserUid), (docSnap) => {
+      if (docSnap.exists()) {
+        const currentUserData = docSnap.data();
+        
+        // Update each search result's connection status in real-time
+        setSearchResults((prevResults) =>
+          prevResults.map((item) => {
+            const isConnected = currentUserData.connections?.includes(item.id) || false;
+            const isPendingRequest = currentUserData.pendingRequests?.includes(item.id) || false;
+            return { ...item, connectionStatus: { isConnected, isPendingRequest } };
+          })
+        );
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentUserUid]);
 
   const handleSearch = async () => {
+    if (!searchTerm.trim()) return;
+
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('username', '==', searchTerm));
     const querySnapshot = await getDocs(q);
-    
+
     const results = [];
     for (const docSnap of querySnapshot.docs) {
       const userData = docSnap.data();
       const userId = docSnap.id;
-      if (userId !== auth.currentUser.uid) {
-        const { isPendingRequest, isConnected } = await fetchConnectionStatus(userId);
-        results.push({ id: userId, ...userData, isPendingRequest, isConnected });
+      if (userId !== currentUserUid) { // Exclude current user from search results
+        const isConnected = userData.connections?.includes(currentUserUid) || false;
+        const isPendingRequest = userData.pendingRequests?.includes(currentUserUid) || false;
+        results.push({ id: userId, ...userData, connectionStatus: { isConnected, isPendingRequest } });
       }
     }
     setSearchResults(results);
   };
 
-  const handleConnect = async (userId, isPendingRequest, isConnected) => {
+  const handleConnect = async (userId, connectionStatus) => {
+    const { isPendingRequest, isConnected } = connectionStatus;
+
     try {
       const userDocRef = doc(db, 'users', userId);
-      const currentUserUid = auth.currentUser.uid;
+      const currentUserDocRef = doc(db, 'users', currentUserUid);
 
       if (isConnected) {
+        // Disconnect the user
         await updateDoc(userDocRef, {
-          connections: arrayRemove(currentUserUid)
+          connections: arrayRemove(currentUserUid),
         });
-        await updateDoc(doc(db, 'users', currentUserUid), {
-          connections: arrayRemove(userId)
+        await updateDoc(currentUserDocRef, {
+          connections: arrayRemove(userId),
         });
         Alert.alert('Disconnected', 'You are no longer connected.');
       } else if (isPendingRequest) {
+        // Unsend the connection request
         await updateDoc(userDocRef, {
-          pendingRequests: arrayRemove(currentUserUid)
+          pendingRequests: arrayRemove(currentUserUid),
         });
         Alert.alert('Request Canceled', 'You have unsent the connection request.');
       } else {
+        // Send a connection request
         await updateDoc(userDocRef, {
-          pendingRequests: arrayUnion(currentUserUid)
+          pendingRequests: arrayUnion(currentUserUid),
         });
         Alert.alert('Request Sent', 'Connection request has been sent!');
       }
 
-      handleSearch(); // Refresh search results to reflect new connection state
+      // Refresh connection status after action
+      handleSearch();
     } catch (error) {
       Alert.alert('Error', error.message);
     }
   };
 
-  // Navigate to the other user's profile
-  const viewUserProfile = (userId) => {
-    navigation.navigate('OtherUserProfile', { userId });
-  };
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await handleSearch(); // Refresh the search results
+    setRefreshing(false);
+  }, [searchTerm]);
 
   return (
     <View style={styles.container}>
@@ -92,18 +108,21 @@ const SearchScreen = ({ navigation }) => {
       <FlatList
         data={searchResults}
         keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => (
           <View style={styles.resultContainer}>
-            <TouchableOpacity onPress={() => viewUserProfile(item.id)}>
-              <Text style={styles.userText}>{item.name}</Text>
-            </TouchableOpacity>
+            <Text>{item.name}</Text>
             <Text>{item.email}</Text>
             <TouchableOpacity
-              onPress={() => handleConnect(item.id, item.isPendingRequest, item.isConnected)}
+              onPress={() => handleConnect(item.id, item.connectionStatus)}
               style={styles.connectButton}
             >
               <Text style={styles.buttonText}>
-                {item.isConnected ? 'Disconnect' : item.isPendingRequest ? 'Unsend' : 'Connect'}
+                {item.connectionStatus.isConnected
+                  ? 'Disconnect'
+                  : item.connectionStatus.isPendingRequest
+                  ? 'Unsend'
+                  : 'Connect'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -137,16 +156,9 @@ const styles = StyleSheet.create({
   resultContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
-  },
-  userText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E90FF',
-    marginRight: 10,
   },
   connectButton: {
     backgroundColor: '#1E90FF',
