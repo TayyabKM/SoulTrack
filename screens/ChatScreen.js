@@ -1,24 +1,21 @@
 // screens/ChatScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, FlatList, StyleSheet } from 'react-native';
+import { View, TextInput, Button, FlatList, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { db, auth } from '../services/firebaseConfig';
-import { collection, addDoc, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 
-const ChatScreen = ({ route }) => {
-  const { connectionUserId } = route.params; // The ID of the user you’re chatting with
+const ChatScreen = () => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const currentUserId = auth.currentUser.uid;
-
-  // Generate a unique chat ID based on user IDs
-  const chatId = [currentUserId, connectionUserId].sort().join('_'); 
+  const currentUser = auth.currentUser;
 
   useEffect(() => {
-    const messagesRef = collection(db, 'chats', chatId, 'messages');
-    const q = query(messagesRef, orderBy('timestamp'));
+    const chatId = 'YOUR_CHAT_ID'; // Replace with your chat ID logic
 
-    // Listen for real-time updates to messages
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const messagesRef = collection(db, 'chats', chatId, 'messages');
+    const messagesQuery = query(messagesRef, orderBy('timestamp', 'desc'));
+
+    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
       const fetchedMessages = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -27,80 +24,94 @@ const ChatScreen = ({ route }) => {
     });
 
     return () => unsubscribe();
-  }, [chatId]);
+  }, []);
 
   const handleSendMessage = async () => {
     if (newMessage.trim()) {
-      const messagesRef = collection(db, 'chats', chatId, 'messages');
-      await addDoc(messagesRef, {
-        senderId: currentUserId,
-        text: newMessage,
-        timestamp: serverTimestamp(),
-      });
-      setNewMessage('');
+      try {
+        const chatId = 'YOUR_CHAT_ID'; // Replace with your chat ID logic
+
+        const messagesRef = collection(db, 'chats', chatId, 'messages');
+        await addDoc(messagesRef, {
+          text: newMessage,
+          senderId: currentUser.uid,
+          timestamp: new Date(),
+        });
+
+        setNewMessage('');
+      } catch (error) {
+        console.error('Error sending message:', error.message);
+      }
     }
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
       <FlatList
         data={messages}
         keyExtractor={(item) => item.id}
+        inverted // This inverts the list to show the latest message at the bottom
         renderItem={({ item }) => (
-          <View style={[
-            styles.message,
-            item.senderId === currentUserId ? styles.myMessage : styles.theirMessage
-          ]}>
-            <Text>{item.text}</Text>
+          <View style={[styles.messageContainer, item.senderId === currentUser.uid ? styles.myMessage : styles.theirMessage]}>
+            <Text style={styles.messageText}>{item.text}</Text>
           </View>
         )}
-        inverted // Scroll to the latest message
+        contentContainerStyle={{ padding: 10 }}
       />
+
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="Type a message..."
+          placeholder="Type your message..."
           value={newMessage}
           onChangeText={setNewMessage}
         />
         <Button title="Send" onPress={handleSendMessage} />
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#f0f0f0',
   },
-  message: {
+  messageContainer: {
     padding: 10,
-    borderRadius: 5,
-    marginVertical: 5,
+    borderRadius: 10,
+    marginBottom: 8,
+    maxWidth: '70%',
   },
   myMessage: {
+    backgroundColor: '#DCF8C5',
     alignSelf: 'flex-end',
-    backgroundColor: '#DCF8C5', // light green
   },
   theirMessage: {
+    backgroundColor: '#fff',
     alignSelf: 'flex-start',
-    backgroundColor: '#E5E5EA', // light grey
+  },
+  messageText: {
+    fontSize: 16,
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     padding: 10,
     borderTopWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#ddd',
   },
   input: {
     flex: 1,
     padding: 10,
-    borderWidth: 1,
     borderColor: '#ccc',
-    borderRadius: 5,
+    borderWidth: 1,
+    borderRadius: 20,
+    marginRight: 10,
+    backgroundColor: '#fff',
   },
 });
 
