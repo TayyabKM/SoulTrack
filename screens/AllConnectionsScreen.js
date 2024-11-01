@@ -57,12 +57,22 @@ const AllConnectionsScreen = ({ navigation }) => {
     }
   };
 
+  const handleChat = (connectionId, connectionName) => {
+    navigation.navigate('Chat', { connectionUserId: connectionId, connectionUserName: connectionName });
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>All Connections</Text>
-      <TouchableOpacity onPress={() => navigation.navigate('Connections')}>
-        <Text style={styles.link}>Connection Requests</Text>
+
+      {/* Button to view Connection Requests */}
+      <TouchableOpacity
+        style={styles.requestsButton}
+        onPress={() => navigation.navigate('Connections')}
+      >
+        <Text style={styles.requestsButtonText}>Connection Requests</Text>
       </TouchableOpacity>
+
       <FlatList
         data={connections}
         keyExtractor={(item) => item.id}
@@ -70,10 +80,21 @@ const AllConnectionsScreen = ({ navigation }) => {
           <View style={styles.connectionContainer}>
             <TouchableOpacity
               onPress={() => navigation.navigate('OtherUserProfile', { userId: item.id })}
+              style={styles.connectionDetails}
             >
-              <Text>{item.name}</Text>
-              <Text>{item.email}</Text>
+              <Text style={styles.connectionName}>{item.name}</Text>
+              <Text style={styles.connectionEmail}>{item.email}</Text>
             </TouchableOpacity>
+            
+            {/* Chat button */}
+            <TouchableOpacity
+              style={styles.chatButton}
+              onPress={() => handleChat(item.id, item.name)}
+            >
+              <Text style={styles.buttonText}>Chat</Text>
+            </TouchableOpacity>
+
+            {/* Disconnect button */}
             <TouchableOpacity
               style={styles.disconnectButton}
               onPress={() => handleDisconnect(item.id)}
@@ -100,19 +121,42 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
-  link: {
-    color: '#1E90FF',
-    fontSize: 16,
-    textAlign: 'center',
+  requestsButton: {
+    backgroundColor: '#1E90FF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    alignItems: 'center',
     marginBottom: 20,
   },
+  requestsButtonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
   connectionContainer: {
-    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  },
+  connectionDetails: {
+    flex: 1,
+  },
+  connectionName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  connectionEmail: {
+    fontSize: 14,
+    color: '#555',
+  },
+  chatButton: {
+    backgroundColor: '#4682B4',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+    marginRight: 10,
   },
   disconnectButton: {
     backgroundColor: '#FF6347',

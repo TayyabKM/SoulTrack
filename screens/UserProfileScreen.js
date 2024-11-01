@@ -1,6 +1,6 @@
 // screens/UserProfileScreen.js
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Button, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { auth, db } from '../services/firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -65,8 +65,22 @@ const UserProfileScreen = ({ navigation }) => {
       <Text style={styles.info}>Name: {userData.name}</Text>
       <Text style={styles.info}>Username: {userData.username}</Text>
       <Text style={styles.info}>Email: {userData.email}</Text>
-      <Button title="View Connections" onPress={() => navigation.navigate('AllConnections')} />
-      <Button title="Logout" onPress={handleLogout} />
+
+      {/* Button to view all connections */}
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => navigation.navigate('AllConnections')}
+      >
+        <Text style={styles.buttonText}>View Connections</Text>
+      </TouchableOpacity>
+
+      {/* Logout button */}
+      <TouchableOpacity
+        style={[styles.button, styles.logoutButton]}
+        onPress={handleLogout}
+      >
+        <Text style={styles.buttonText}>Logout</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -88,6 +102,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginVertical: 10,
     textAlign: 'center',
+  },
+  button: {
+    backgroundColor: '#1E90FF',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    marginVertical: 10,
+    alignItems: 'center',
+  },
+  logoutButton: {
+    backgroundColor: '#FF6347', // Different color for logout
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
